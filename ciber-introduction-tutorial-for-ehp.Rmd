@@ -374,7 +374,7 @@ In the left situation, the correlations indicate that both attitude and self-ide
 
 However, the right graph paints a different picture. When both predictors represent determinants that are defined, and operationalised, as partly covering the same aspects of human psychology, the difference between correlations and regression coefficients becomes substantial. Whereas the correlation coefficients would again imply that both determinants are feasible intervention targets, based on the regression coefficients, attitude seems irrelevant to predicting intention.
 
-That conclusion, however, would be wrong. It would be valid only if one would redefine attitude such that all overlap with self-identity, in their prediction of intention, is removed from attitude's variance. That would mean the resulting data seties (i.e. the residuals) no longer represent the determinant attitude. After all, that construct's definition did include importance.
+That conclusion, however, would be wrong. It would be valid only if one would redefine attitude such that all overlap with self-identity, in their prediction of intention, is removed from attitude's variance. That would mean the resulting data series (i.e. the residuals) no longer represent the determinant attitude. After all, that construct's definition did include importance.
 
 It is unclear what exactly the two remaining data series do represent. Psychological constructs often covary, and this covariance represents not bias or measurement error, but real aspects of human psychology. Removing such covariance from estimations of a construct's importance means that it is no longer clear what is being inspected.
 
@@ -443,7 +443,7 @@ It is possible to customize the plot by specifying, as was done in Figure 2, the
 
 ## Conclusion
 
-Establishing the relative importance of a set of (sub-)determinants, to then select the best intervention targets and be able to select the most fitting behavior change principles (e.g. methods for behavior change or behavior change techniques), is no straightforward affair. This involves a number of pitfalls. In this article, we aimed to describe these pitfall, explain why they are problematic, and we present an easy-to-use solution that is freely available. CIBER plots allow researchers and intervention developers to simultaneously evaluate the large amounts of information that need to be evaluated to select the determinants to target in an intervention to optimize the probability of successful behavior change. We hope this can contribute to more informed determinant selection and ultimately, more effective behavior change interventions.
+Establishing the relative importance of a set of (sub-)determinants, to then select the best intervention targets and be able to select the most fitting behavior change principles (e.g. methods for behavior change or behavior change techniques), is no straightforward affair. There are a number of potential pitfalls. In this article, we aimed to describe these pitfalls, explain why they are problematic, and we present an easy-to-use solution that is freely available. CIBER plots allow researchers and intervention developers to simultaneously evaluate the large amounts of information that need to be evaluated to select the determinants to target in an intervention to optimize the probability of successful behavior change. We hope this can contribute to more informed determinant selection and ultimately, more effective behavior change interventions.
 
 
 
