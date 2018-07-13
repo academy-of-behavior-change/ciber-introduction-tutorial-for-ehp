@@ -386,7 +386,7 @@ Thus, because estimates from multivariate analyses are problematic when establis
 
 To illustrate confidence interval based estimation of relevance (CIBER), we will use four subdeterminants of attitude as these allow a more complete demonstration. The resulting CIBER plot is shown in Figure 2 (we refer readers who are interested in the CIBER plots obtained from the determinants' association with intention to the OSF repository of this article at https://osf.io/hg4ks/).
 
-```{r figure-2, fig.width=11, fig.height=5, fig.cap="CIBER plots of both situations."}
+```{r figure-2, fig.width=11, fig.height=5, fig.cap="CIBER plots of both situations.", warning=FALSE}
 fig2 <- CIBER(dat,
               determinants=c('attitude_good',
                              'attitude_pleasant',
