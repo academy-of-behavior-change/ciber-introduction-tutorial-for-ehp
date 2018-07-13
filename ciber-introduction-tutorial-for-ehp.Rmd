@@ -292,7 +292,7 @@ dat[, scaleNames] <- lapply(dat[, scaleNames],
 
 # Manuscript text
 
-When developing behavior change interventions, it is important to target the most important determinants of behavior. This is challenging for two reasons. First, determinant selection requires integrating multiple information sources: determinants' associations to behavior or determinants mediating an effect on behavior (i.e. effect sizes), as well as how much room for improvement there is in the population (i.e. means and spread). Second, only information from samples is normally available, which means that point estimates will vary from sample to sample. In practice, determinant studies often present multivariate regression analyses, but this is problematic because by default, shared covariance is removed from the equation (literally), compromising operationalisations' validity.
+When developing behavior change interventions, it is important to target the most important determinants of behavior. This is challenging for two reasons. First, determinant selection requires integrating multiple information sources: determinants' associations to behavior or determinants mediating an effect on behavior (i.e. effect sizes), as well as how much room for improvement there is in the population (i.e. means and spread). Second, only information from samples is normally available, which means that point estimates will vary from sample to sample. In practice, determinant studies often present multivariate regression analyses, but this is problematic because by default, shared covariance is removed from the equation (literally), compromising operationalisations' validity and affecting effect sizes (i.e., the results of such analyses cannot be used as a first source of information regarding each determinant's association to behavior).
 
 In the present contribution, we will briefly explain these points in more detail, after which we will introduce a solution: confidence interval based estimation of relevance (CIBER). We will then present a brief tutorial as to how to generate CIBER plots and how to interpret them.
 
@@ -306,7 +306,7 @@ Similarly, psychologists have studied the aspects of human psychology that deter
 
 Given the richness of human psychology, it is no surprise that there exist no 'magic bullet' behavior change principles that can always be relied on. Instead, which behavior change principles are most likely to be effective depends on which types of memories must be targeted. This link manifests as a pairing of determinants and behavior change principles, such that the likelihood of engaging the underlying evolutionary learning principles is optimal.
 
-As a consequence, a crucial step in the development of behavior change interventions is the selection of the most important determinants.
+As a consequence, a crucial step in the development of behavior change interventions is the selection of the most important determinants. After all, these determinants can be seen as the buttons one needs to push to establish behavior change.
 
 ## When a determinant is important
 
