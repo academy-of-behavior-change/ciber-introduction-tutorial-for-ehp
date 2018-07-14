@@ -285,8 +285,13 @@ dat <- makeScales(dat,
                                                   importanceItems)));
 
 ### Standardizing the variables
-dat[, scaleNames] <- lapply(dat[, scaleNames],
-                            scale);
+dat[, c(scaleNames,
+        'attitudeImportance',
+        'selfIdentityImportance')] <-
+  lapply(dat[, c(scaleNames,
+                 'attitudeImportance',
+                 'selfIdentityImportance')],
+         scale);
 
 ```
 
@@ -510,3 +515,10 @@ grid.arrange(CIBER(dat, determinants=c('attitude', 'selfIdentity'), targets='int
              ncol=1);
 ```
 
+```{r extrastuff, eval=FALSE, include=FALSE}
+testDat <- dat[, c('intention', 'attitudeImportance', 'selfIdentityImportance')];
+names(testDat) <- c('Y', 'X1', 'X2');
+round(cor(testDat), 2);
+regr(Y ~ X1 + X2, data=testDat);
+regsCovarPlot(Y ~ X1 + X2, testDat);
+```
