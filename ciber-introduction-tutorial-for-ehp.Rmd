@@ -438,9 +438,15 @@ CIBER(data=dat,
       targets=c('attitude', 'intention'));
 ```
 
-In this command, the first argument ('data') specifies the data to use; the second argument ('determinants'), the determinants (the rows of the CIBER plot); and the third argument ('targets'), the higher level determinants or behavior variables with which to show associations in the right-hand panel.
+In this command, the first argument ('data') specifies the data to use. This is a dataset that can be loaded into R using, for example, the `getData` command:
 
-It is possible to customize the plot by specifying, as was done in Figure 2, the questions used for each (sub-)determinant by using the 'subQuestions' argument; the left and right anchors by using the 'leftAnchor' and 'rightAnchor' arguments, and it is also possible to change the colors and set other options. An overview of all available options is available by using the following command, which will load the manual page for the CIBER command:
+```
+dat <- getData();
+```
+
+This will open a popup dialog where a datafile can be selected. The selected datafile is then read into memory and named `dat` (in R, multiple datasets can always be open, and therefore, naming a dataset when loading it is mandatory). The other two arguments, 'determinants', and 'targets' specific the variable names of the determinants (the rows of the CIBER plot) and the the higher level determinants or behavior variables with which to show associations in the right-hand panel. Thus, in the simplest case, it is possible to simply load one's dataset into R using the `getData` command and then use the `CIBER` command to specify which determinants and targets to plot.
+
+It is also possible to customize the plot by specifying, as was done in Figure 2, the questions used for each (sub-)determinant by using the 'subQuestions' argument; the left and right anchors by using the 'leftAnchor' and 'rightAnchor' arguments, and it is also possible to change the colors and set other options. An overview of all available options is available by using the following command, which will load the manual page for the CIBER command:
 
 ```
 ?CIBER
