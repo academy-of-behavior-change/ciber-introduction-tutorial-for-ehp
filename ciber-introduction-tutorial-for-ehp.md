@@ -1,313 +1,16 @@
----
-title: 'Establishing determinant importance using CIBER: an introduction and tutorial'
-author: "Gjalt-Jorn Peters & Rik Crutzen"
-date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (GMT%z)')`"
-output:
-  md_document:
-    variant: markdown_github
-  html_document:
-    df_print: kable
-    toc: false
-    self_contained: true
----
-
 <!--   This is the R Markdown file for the article "Establishing     -->
 <!--   determinant importance using CIBER: an introduction and       -->
 <!--   tutorial" by Crutzen and Peters, 2018. Scroll down for the    -->
 <!--   article text, and further down for the analyses.              -->
-
-```{r setup, include=FALSE}
-#############################################################################
-### Packages
-#############################################################################
-
-if (!require('userfriendlyscience', quietly = FALSE)) {
-  stop("You need to have the userfriendlyscience package installed!");
-}
-safeRequire('scales');    ### For rescale
-safeRequire('dplyr');     ### For case_when
-safeRequire('ppcor');     ### To compute partial and semipartial correlations
-safeRequire('eulerr');    ### Venn-Euler diagrams
-safeRequire('viridis');   ### Colors
-safeRequire('gridExtra'); ### Combining plots
-safeRequire('grid');      ### Drawing plots
-safeRequire('ggplot2');   ### Saving plots
-safeRequire('knitr');     ### Printing tables using kable
-safeRequire('pander');    ### Pretty printing of associationMatrix
-
-########################################################################
-### Settings
-########################################################################
-
-knitr::opts_chunk$set(echo=FALSE,
-                      cache=FALSE,
-                      comment=NA,
-                      rows.print=40);
-
-options(width = 160);
-options(xtable.type = "html");
-options(ufs.debug = FALSE);
-
-```
-
-```{r regsCovarPlot}
-
-regsCovarPlot <- function(formula, data, circle=FALSE, silent=TRUE) {
-  varNames <- all.vars(formula);
-  if (length(varNames) != 3) {
-    stop("This function only works for exactly three variables (one ",
-         "criterion (or dependent variable) and two predictors). You ",
-         "supplied ", length(varNames), ".");
-  }
-  dat <- data[, varNames];
-  dat <- dat[complete.cases(dat), ];
-  yName <- varNames[1];
-  x1Name <- varNames[2];
-  x2Name <- varNames[3];
-  dat[, yName] <- scale(dat[, yName]);
-  dat[, x1Name] <- scale(dat[, x1Name]);
-  dat[, x2Name] <- scale(dat[, x2Name]);
-  cors <- cor(dat);
-  pcors <- pcor(dat)$estimate;
-  spcors <- spcor(dat)$estimate;
-  
-  lmForY <- lm(as.formula(paste0(yName, "~", x1Name, "+", x2Name)),
-               data=dat);
-  
-  Rsq.y.x1x2 <-
-    summary(lmForY)$r.squared;
-  Rsq.x1.x2y <-
-    summary(lm(as.formula(paste0(x1Name, "~", x2Name, "+", yName)),
-               data=dat))$r.squared;
-  Rsq.x2.x1y <-
-    summary(lm(as.formula(paste0(x2Name, "~", x1Name, "+", yName)),
-               data=dat))$r.squared;
-
-  Rsq.y.x1 <-
-    cors[yName, x1Name]^2;
-  Rsq.y.x2 <-
-    cors[yName, x2Name]^2;
-  Rsq.x1.x2 <-
-    cors[x1Name, x2Name]^2;
-
-  y.unique <- 1 - Rsq.y.x1x2;
-  x1.unique <- 1- Rsq.x1.x2y;
-  x2.unique <- 1- Rsq.x2.x1y;
-  
-  x1y <- Rsq.y.x1x2 - Rsq.y.x2;
-  x2y <- Rsq.y.x1x2 - Rsq.y.x1;
-  
-  x1x2y.fromX1 <- Rsq.y.x1 - x1y;
-  x1x2y.fromX2 <- Rsq.y.x2 - x2y;
-  
-  if (!silent) {
-    if (x1x2y.fromX1 != x1x2y.fromX2) {
-      cat0("There is a minor difference between x1x2y overlap estimated from x1y (", x1x2y.fromX1,
-           ") and from x2y (", x1x2y.fromX2, "). The size of this difference is ",
-           x1x2y.fromX2 - x1x2y.fromX1, ".\n\n");
-    }
-  }
-  
-  x1x2y <- x1x2y.fromX1;
-  
-  x1x2 <- Rsq.x1.x2 - x1x2y;
-
-  coefx1 <- coef(lmForY)[2];
-  coefx2 <- coef(lmForY)[3];
-    
-  inputVector <- c("Y" = round(y.unique, 3),
-                   "X1" = round(x1.unique, 3),
-                   "X2" = round(x2.unique, 3),
-                   "Y&X1&X2" = round(x1x2y, 3),
-                   "Y&X1" = round(x1y, 3),
-                   "Y&X2" = round(x2y, 3),
-                   "X1&X2" = round(x1x2, 3));
-  
-  names(inputVector) <- c(yName,
-                          x1Name,
-                          x2Name,
-                          paste(yName, x1Name, x2Name, sep="&"),
-                          paste(yName, x1Name, sep="&"),
-                          paste(yName, x2Name, sep="&"),
-                          paste(x1Name, x2Name, sep="&"));
-  
-  eulerDiagram.ellipse <- euler(inputVector,
-                                shape='ellipse');
-  eulerDiagram.circle <- euler(inputVector,
-                               shape='circle');
-  
-  if (!silent) {
-    print(cors);
-    cat("\n");
-    cat0("Unique variance in ", yName, ": ", round(y.unique, 3), "\n");
-    cat0("Unique variance in ", x1Name, ": ", round(x1.unique, 3), "\n");
-    cat0("Unique variance in ", x2Name, ": ", round(x2.unique, 3), "\n");
-    cat0("R^2 for ", yName, " from ", x1Name, " & ", x2Name, ": ", round(Rsq.y.x1x2, 3), "\n");
-    cat0("R^2 for ", x1Name, " from ", x2Name, " & ", yName, ": ", round(Rsq.x1.x2y, 3), "\n");
-    cat0("R^2 for ", x2Name, " from ", x1Name, " & ", yName, ": ", round(Rsq.x2.x1y, 3), "\n");
-    cat0("Overlap ", x1Name, " and ", x2Name, " and ", yName, ": ", inputVector[4], "\n");
-    cat0("Overlap ", x1Name, " and ", yName, ": ", inputVector[5], "\n");
-    cat0("Overlap ", x2Name, " and ", yName, ": ", inputVector[6], "\n");
-    cat0("Overlap ", x1Name, " and ", x2Name, ": ", inputVector[7], "\n");
-    cat0("Regression coefficient for ", x1Name, ": ", round(coefx1, 3), " (squared: ", round(coefx1^2, 3), ")\n");
-    cat0("Regression coefficient for ", x2Name, ": ", round(coefx2, 3), " (squared: ", round(coefx2^2, 3), ")\n");
-  }
-  
-  if (circle) {
-    if (!silent) {
-      cat0("\nCircle:\n");
-      print(eulerDiagram.circle);
-    }
-    return(plot(eulerDiagram.circle,
-                           quantities=TRUE,
-                           fill=viridis,
-                           alpha = .2));
-  } else {
-    if (!silent) {
-      cat0("\nEllipse:\n");
-      print(eulerDiagram.ellipse);
-    }
-    return(plot(eulerDiagram.ellipse,
-                           quantities=TRUE,
-                           fill=viridis,
-                           alpha = .2));
-  }
-  
-}
-
-```
-
-```{r questionnaire}
-
-questionnaire <-
-  matrix(c("Intention", "I intend to submit my next manuscript to Health Psychology Bulletin.", "Absolutely not", "Absolutely",
-           "Intention", "I will submit my next manuscript to Health Psychology Bulletin.", "Unlikely", "Likely",
-           "Intention", "I am willing to submit my next manuscript to Health Psychology Bulletin.", "False", "True",
-           "Intention", "I plan to submit my next manuscript to Health Psychology Bulletin.", "Absolutely not", "Absolutely",
-           "Attitude", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Bad", "Good",
-           "Attitude", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Unpleasant", "Pleasant",
-           "Attitude", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Harmful", "Beneficial",
-           "Attitude", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Boring", "Interesting",
-           "Importance", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Unimportant", "Important",
-           "Importance", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Not essential", "Essential",
-           "Importance", "For me, submitting my next manuscript to Health Psychology Bulletin is ...", "Not significant", "Significant",
-           "Self-identity", "I see myself as someone who is concerned about submitting my next manuscript to Health Psychology Bulletin.", "Not at all", "Completely",
-           "Self-identity", "I see myself as someone who submits their next manuscript to Health Psychology Bulletin.", "Not at all", "Completely",
-           "Self-identity", "I would feel at a loss if I were forced to give up submitting my next manuscript to Health Psychology Bulletin.", "Absolutely not", "Absolutely",
-           "Self-identity", "Submitting my next manuscript to Health Psychology Bulletin is an important part of who I am.", "Not at all", "Very much so",
-           "Self-identity", "I am the kind of person who submits their next manuscript to Health Psychology Bulletin.", "Not at all", "Completely",
-           "Self-identity", "For me, submitting my next manuscript to Health Psychology Bulletin means more than just the act itself.", "Not at all", "Very much so",
-           "Self-identity", "Submitting my next manuscript to Health Psychology Bulletin is something I rarely even think about.", "Not at all", "Very much so"),
-         byrow=TRUE,
-         ncol=4);
-
-questionnaire <- as.data.frame(questionnaire);
-names(questionnaire) <- c("Variable", "Item", "Left anchor", "Right anchor");
-
-```
-
-```{r create-dataset, message=FALSE, warning=FALSE}
-
-sampleSize <- 200;
-
-### Simluate a dataset with the latent variables
-
-invisible(capture.output(latentDat <-
-  simDataSet(sampleSize,
-             varNames = c('intention',
-                          'attitude',
-                          'importance',
-                          'selfIdentity'),
-             specifiedCorrelations = list(c('intention', 'attitude', .6),
-                                          c('intention', 'importance', .6),
-                                          c('intention', 'selfIdentity', .6),
-                                          c('attitude', 'importance', .7),
-                                          c('attitude', 'selfIdentity', .5),
-                                          c('importance', 'selfIdentity', .7)),
-             ranges=NULL,
-             seed = 20180721,
-             empirical=FALSE,
-             silent=TRUE)));
-
-### Create items by adding unreliability to each indicator
-
-dat <- data.frame('intention_intend' = latentDat$intention + rnorm(sampleSize, 0, 1),
-                  'intention_will' = latentDat$intention + rnorm(sampleSize, 0, 1),
-                  'intention_willing' = latentDat$intention + rnorm(sampleSize, 0, 1),
-                  'intention_plan' = latentDat$intention + rnorm(sampleSize, 0, 1),
-                  'attitude_good' = latentDat$attitude + rnorm(sampleSize, 0, 1),
-                  'attitude_pleasant' = latentDat$attitude + rnorm(sampleSize, 0, 1),
-                  'attitude_beneficial' = latentDat$attitude + rnorm(sampleSize, 0, 1),
-                  'attitude_interesting' = latentDat$attitude + rnorm(sampleSize, 0, 1),
-                  'importance_important' = latentDat$importance + rnorm(sampleSize, 0, 1),
-                  'importance_essential' = latentDat$importance + rnorm(sampleSize, 0, 1),
-                  'importance_significant' = latentDat$importance + rnorm(sampleSize, 0, 1),
-                  'selfIdentity_concernedAbout' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdentity_considerMyself' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdendity_feelAtALoss' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdentify_importantPart' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdentify_kindOfPerson' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdentify_meansMoreThan' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1),
-                  'selfIdentity_rarelyEvenThinkAbout' = latentDat$selfIdentity + rnorm(sampleSize, 0, 1));
-
-### Recale items to 1-5 response scale; first we rescale to 0-6;
-### then we round all numbers; then we collapse 0 and 1, and 5 and 6.
-dat <- as.data.frame(apply(dat, 2, function(x) {
-  ### Set parameters determining item's distribution
-  lower <- 0;
-  upper <- 6;
-  shift <- 0;
-  ### Rescale, shift, round, and fit into 1-5 scale
-  x <- scales::rescale(x, to=c(lower, upper));
-  x <- x + shift;
-  x <- round(x);
-  x <- dplyr::case_when(x < 1 ~ 1,
-                        x > 5 ~ 5,
-                        TRUE ~ x);
-  }));
-
-### For convenience, make lists with the item names
-scaleNames <- names(latentDat);
-intentionItems <- grep('intention_\\w+', names(dat), value=TRUE);
-attitudeItems <- grep('attitude_\\w+', names(dat), value=TRUE);
-importanceItems <- grep('importance_\\w+', names(dat), value=TRUE);
-selfIdentityItems <- grep('selfIdentity_\\w+', names(dat), value=TRUE);
-
-### Check scale structure
-# scaleStructure(dat, items=intentionItems);
-# scaleStructure(dat, items=attitudeItems);
-# scaleStructure(dat, items=importanceItems);
-# scaleStructure(dat, items=selfIdentityItems);
-
-### Compute scales
-dat <- makeScales(dat,
-                  list(intention = intentionItems,
-                       attitude = attitudeItems,
-                       importance = importanceItems,
-                       selfIdentity = selfIdentityItems,
-                       attitudeImportance = c(attitudeItems,
-                                              importanceItems),
-                       selfIdentityImportance = c(selfIdentityItems,
-                                                  importanceItems)));
-
-### Standardizing the variables
-dat[, c(scaleNames,
-        'attitudeImportance',
-        'selfIdentityImportance')] <-
-  lapply(dat[, c(scaleNames,
-                 'attitudeImportance',
-                 'selfIdentityImportance')],
-         scale);
-
-```
-
-# Manuscript text
+Manuscript text
+===============
 
 When developing behavior change interventions, it is important to target the most important determinants of behavior (i.e. psychological constructs that predict behavior). This is challenging for two reasons. First, determinant selection requires integrating multiple information sources: determinants' associations with either behavior or with determinant that mediate their effect on behavior (i.e. effect sizes), as well as how much room for improvement there is in the population (i.e. means and spread). Second, only information from samples is normally available, and point estimates obtained from samples vary from sample to sample, and therefore cannot be interpreted without information about how much they can be expected to vary over samples. In practice, determinant studies often present multivariate regression analyses, but this is problematic because by default, shared covariance is removed from the equation (literally), compromising operationalisations' validity and affecting effect sizes (i.e., the results of such analyses cannot be used as a first source of information regarding each determinant's association to behavior).
 
 In the present contribution, we will briefly explain these points in more detail, after which we will introduce a solution: confidence interval based estimation of relevance (CIBER). We will then present a brief tutorial as to how to generate CIBER plots and how to interpret them. This is a more detailed explanation and introduction: originally, CIBER was published in Crutzen, Peters & Noijen (2017).
 
-## Why determinant importance is important
+Why determinant importance is important
+---------------------------------------
 
 Public health interventions have to potential to be cost-effective means to improve health and well-being (Masters, Anwar, Collins, Cookson & Capewell, 2017). They often do this by targeting human behavior. All overt human behavior is controlled from neurons in the motor cortex, activation of which occurs through activation of other networks of neurons (for more background, see Peters & Crutzen, 2017, and Crutzen & Peters, 2018). The networks of neurons that form a human brain can be considered the neural substrate of the entirety of human psychology. Therefore, while on a neuronal level, any successful behavior change intervention necessarily achieves this success by changing neural networks that ultimately activate motor cortex neurons, on a psychological level, any successful behavior change intervention can be said to necessarily achieve this success by changing aspects of the human psychology that are important for the target behavior.
 
@@ -319,7 +22,8 @@ Given the richness of human psychology, it is no surprise that there exist no 'm
 
 As a consequence, a crucial step in the development of behavior change interventions is the selection of the most important determinants. Colloquially, these determinants can be seen as the buttons one needs to push to establish behavior change.
 
-## When a determinant is important
+When a determinant is important
+-------------------------------
 
 Determinant importance depends on two things. The first is the determinant's association to behavior, or, as is often the case, to a theoretical mediator of the determinant's effect on behavior. For example, when an interventon developer develops an intervention for a reasoned behavior, a suitable theory may be the Reaoned Action Approach (RAA; Fishbein & Ajzen, 2010). This theory holds that behavior is predicted by a determinant called intention (i.e. a person's intention to engage in the behavior), which in turn is predicted by three other determinants: attitude (a person's evaluation of the behavior's consequences), perceived norms (a person's perception of the approval and behavior of relevant social referents), and perceived behavioral control (a person's perception of their ability and control over the behavior). If a determinant study is conducted and the correlation of attitude to intention and behavior is zero, it seems unlikely that changes in attitude will result in behavior change. However, even if a determinant is strongly associated to behavior or a theoretical mediator, it may still not be a relevant intervention target.
 
@@ -329,7 +33,8 @@ Note that this reasoning does not only hold when selecting determinants (such as
 
 So, to summarize, successful behavior change requires successful change of one or more aspects of human psychology. These aspects are defined in, and can be operationalised using, psychological theory, and are called (sub-)determinants. Once operationalised, their importance can be established to identify the best intervention targets. Establishing this (sub-)determinant importance requires simultaneous inspection of the determinant's association to theoretical mediators of its effects on behavior, potentially to behavior directly, and of the determinant's distribution. Most researchers do this by computing point estimates (e.g., correlation coefficients), but unfortunately, these are virtually uninformative on their own.
 
-## Why point estimates cannot be used to estimate determinant importance
+Why point estimates cannot be used to estimate determinant importance
+---------------------------------------------------------------------
 
 When inspecting association and distribution estimates, the population values are always unknown. The only way to learn about a population is by taking a random sample and inspecting that sample. This instrument, however, is somewhat of a mixed blessing. On the one hand, sampling provides the researcher with a way to 'look at' the population. On the other hand, sampling, by its random nature, necessarily introduces random variation. This means that whatever is observed in the sample may not reflect the population.
 
@@ -341,13 +46,14 @@ The best known example is perhaps the sampling distribution of the mean, which i
 
 Therefore, whenever using sample data to draw conclusions for intervention development (or anything, really), point estimates should not be used. Instead, also considering estimate accuracy, for example by computing confidence intervals, allows taking the inevitable sampling and error variation into account. However, this also means that inspecting determinant importance becomes almost an inhuman task: one has to simultaneously compare three times as much information (e.g., means *and* correlations coefficients, as well as the confidence intervals regarding *both* point estimates). Visualisation can help, and this is what confidence interval based estimation of relevance (CIBER) is based on. CIBER plots simultaneously visualise (sub-)determinant distributions, confidence intervals for the mean, and confidence intervals for bivariate correlations to one or more theoretical mediators and/or behavior. Before explaining how to order and read a CIBER plot, we will explain why CIBER plots use correlations instead of regression coefficients.
 
-## Why regression coefficients cannot be used to estimate determinant importance
+Why regression coefficients cannot be used to estimate determinant importance
+-----------------------------------------------------------------------------
 
 Determinant studies often contain regression analyses where a theoretical mediator of determinants' effects on behavior (e.g., intention) or behavior itself, is regressed on the measured determinants (or subdeterminants). Such regression analyses are useful, because they yield a multiple correlation coefficient: the correlation of the criterion (dependent variable) with the best prediction of the criterion as computed from the predictors in the model. Squaring this multiple correlation coefficient yields *R<sup>2</sup>*, the proportion of the variance in the criterion that can be explained by the predictors in this sample. Because the distribution of *R<sup>2</sup>* is known, a confidence interval can be constructed, allowing tentative conclusions as to likely population *R<sup>2</sup>* values, which is indicative of the maximum effect that can be expected of an intervention that successfully changes all determinants in the model.
 
-A convenient feature of regression analysis is that overlap between predictors in their explanation of the criterion is removed from the equation (quite literally, in the case of regression). Squaring a correlation coefficient always yields the proportion of explained variance: if attitude and intention have a bivariate (i.e. zero-order) correlation of *r* = `r formatR(cor(dat$intention, dat$attitude))`, that means that they each explain `r formatR(cor(dat$intention, dat$attitude)^2)` (i.e., `r formatR(cor(dat$intention, dat$attitude))` x `r formatR(cor(dat$intention, dat$attitude))`) of each other's variance in the sample. The 95% confidence interval runs from `r formatCI(regr(dat$intention ~ dat$attitude)$output$rsq.ci)`, which gives some idea of how far the explained variance in the population can be expected to deviate from that sample estimate. Another determinant, self-identity, has a correlation of *r*=`r formatR(cor(dat$intention, dat$selfIdentity))` with intention, and so this determinant explains `r formatR(cor(dat$intention, dat$selfIdentity)^2)` of intention.
+A convenient feature of regression analysis is that overlap between predictors in their explanation of the criterion is removed from the equation (quite literally, in the case of regression). Squaring a correlation coefficient always yields the proportion of explained variance: if attitude and intention have a bivariate (i.e. zero-order) correlation of *r* = .32, that means that they each explain .1 (i.e., .32 x .32) of each other's variance in the sample. The 95% confidence interval runs from \[0.03; 0.19\], which gives some idea of how far the explained variance in the population can be expected to deviate from that sample estimate. Another determinant, self-identity, has a correlation of *r*=.47 with intention, and so this determinant explains .22 of intention.
 
-However, attitude and self-identity correlate with each other (*r* = `r formatR(cor(dat$attitude, dat$selfIdentity))`). It is therefore likely that they also share explained variance in intention. In that case, simply adding together the proportion of intention's variance they each explain (`r formatR(cor(dat$intention, dat$attitude)^2)` + `r formatR(cor(dat$intention, dat$selfIdentity)^2)` = `r formatR(cor(dat$intention, dat$attitude)^2 + cor(dat$intention, dat$selfIdentity)^2)`) would yield an overestimate of how much intention these determinants explain together (which is in fact `r formatR(regr(dat$intention ~ dat$attitude + dat$selfIdentity)$intermediate$rsq)` in this sample, with a 95% confidence interval of `r formatCI(regr(dat$intention ~ dat$attitude + dat$selfIdentity)$output$rsq.ci)`).
+However, attitude and self-identity correlate with each other (*r* = .32). It is therefore likely that they also share explained variance in intention. In that case, simply adding together the proportion of intention's variance they each explain (.1 + .22 = .32) would yield an overestimate of how much intention these determinants explain together (which is in fact .25 in this sample, with a 95% confidence interval of \[0.15; 0.36\]).
 
 This correction of overlap in explained variance is very useful, and enables better estimation of the variance explained by all predictors together. However, this overlap between predictors is in itself highly problematic when dealing with the separate regression coefficients of all psychological constructs used as predictors (Azen & Budescu, 2003; Budescu, 1993; Elwert & Winship, 2014). This problem is in part the consequence of potential overlap in the operationalisations of these psychological constructs.
 
@@ -359,27 +65,15 @@ This is a necessary consequence of observational research: if two dataseries sha
 
 Another way to think about this is by using the formulation often invoked when explaining regression analyses: the regression coefficient expresses the association of a predictor to the criterion *holding all other predictors constant*. If two predictors overlap in their definition, or, in other words, if the definitions of the constructs represented by the two predictors contain the same aspects of human psychology, then 'holding all other predictors constant' means 'neglecting a part of human psychology'. This means the resulting situation is unrealistic and can never occur. Given that the operationalisations of both constructs was valid, this also means that the omitted aspects of human psychology are in fact important to predicting the relevant behavior. Therefore, a predictor that represents an important determinant of behavior may nonetheless have a small regression coefficient, because an important part of the human psychology as defined in the constructs definition was omitted from the coefficient.
 
-Because this can be hard to grasp, we include an example. Imagine we do a small-scale determinant study. We measure two determinants of intention: attitude and self-identity. Self-identity is one of the variables explicitly covered by Fishbein and Ajzen (2010) in their discussion of potential fourth variables that could be added to the Theory of Planned Behavior (or, by implication, its successor, the Reasoned Action Approach). They argued that the concept was ill-defined, and that common operationalisations actually covered the perceived 'importance' of a behavior. They argued that this can be considered part of the attitude construct, and therefore, including 'importance scale' in attitude's measurement would eliminate any additional explained variance by self-identity: "[...] if importance scales were included in the semantic differential measure of attitude, obtaining a separate measure of self-identity by means of importance items would be of little value." (Fishbein & Ajzen, p. 292). Given that importance can clearly be considered both a part of attitude and self-identity, this lends it well to an illustration of our point.
+Because this can be hard to grasp, we include an example. Imagine we do a small-scale determinant study. We measure two determinants of intention: attitude and self-identity. Self-identity is one of the variables explicitly covered by Fishbein and Ajzen (2010) in their discussion of potential fourth variables that could be added to the Theory of Planned Behavior (or, by implication, its successor, the Reasoned Action Approach). They argued that the concept was ill-defined, and that common operationalisations actually covered the perceived 'importance' of a behavior. They argued that this can be considered part of the attitude construct, and therefore, including 'importance scale' in attitude's measurement would eliminate any additional explained variance by self-identity: "\[...\] if importance scales were included in the semantic differential measure of attitude, obtaining a separate measure of self-identity by means of importance items would be of little value." (Fishbein & Ajzen, p. 292). Given that importance can clearly be considered both a part of attitude and self-identity, this lends it well to an illustration of our point.
 
-In this hypothetical determinant study, therefore, we include the importance scale in addition to the determinants (attitude and self-identity) and the criterion (intention). We have included the items used in this hypothetical study in the R Markdown file in the supplementary materials (see the Open Science Framework at https://osf.io/hg4ks/). The correlations used in the earlier illustrations were in fact derived from the dataset we simulated for this hypothetical determinant study. Figure 1 shows two Venn Euler diagrams that use the `eulerr` package (Larsson, 2018) to show the proportional areas of overlap in explained variance between the three variables in this determinant study.
+In this hypothetical determinant study, therefore, we include the importance scale in addition to the determinants (attitude and self-identity) and the criterion (intention). We have included the items used in this hypothetical study in the R Markdown file in the supplementary materials (see the Open Science Framework at <https://osf.io/hg4ks/>). The correlations used in the earlier illustrations were in fact derived from the dataset we simulated for this hypothetical determinant study. Figure 1 shows two Venn Euler diagrams that use the `eulerr` package (Larsson, 2018) to show the proportional areas of overlap in explained variance between the three variables in this determinant study.
 
-```{r figure-1, fig.width=11, fig.height=5, fig.cap="Figure 1: Venn Euler diagrams showing the overlap in explained variance between attitude, self-identity, and intention. In the diagram on the left, the importance scale is left out of the operationalisation op attitude and self-identity; in the diagram on the right, it is included in both operationalisations."}
-fig1 <-
-  arrangeGrob(regsCovarPlot(intention ~ attitude + selfIdentity,
-                            dat),
-              regsCovarPlot(intention ~ attitudeImportance + selfIdentityImportance,
-                            dat),
-              ncol=2);
-grid.draw(fig1);
-ggsave(fig1,
-       filename = "figure1.png",
-       width=11, height=5);
+![Figure 1: Venn Euler diagrams showing the overlap in explained variance between attitude, self-identity, and intention. In the diagram on the left, the importance scale is left out of the operationalisation op attitude and self-identity; in the diagram on the right, it is included in both operationalisations.](ciber-introduction-tutorial-for-ehp_files/figure-markdown_github/figure-1-1.png)
 
-```
+The left diagram shows the situation where attitude and self-identity are operationalised without including the importance scale. Therefore, these variables represent a more limited definition of the attitude and self-identity constructs. In this sample, the correlation coefficients with intention are .32 for attitude and .47 for self-identity, they together explain .25 of the variance in intention, and their regression coefficients are respectively .18 and .41 (all variables are standardized). As the left diagram shows, the squared correlation between attitude and intention is *r*^2 = .03 + .07 = .10, and the squared correlation between self-identify and intention is *r*^2 = .151 + .07 = .221. In this situation, .07 or seven percent of the covariance between the variables is omitted from the equation when the regression coefficients are estimated.
 
-The left diagram shows the situation where attitude and self-identity are operationalised without including the importance scale. Therefore, these variables represent a more limited definition of the attitude and self-identity constructs. In this sample, the correlation coefficients with intention are `r formatR(cor(dat$intention, dat$attitude))` for attitude and `r formatR(cor(dat$intention, dat$selfIdentity))` for self-identity, they together explain `r formatR(regr(dat$intention ~ dat$attitude + dat$selfIdentity)$intermediate$rsq)` of the variance in intention, and their regression coefficients are respectively `r formatR(regr(dat$intention ~ dat$attitude + dat$selfIdentity)$output$coef.raw['attitude', 'estimate'])` and `r formatR(regr(dat$intention ~ dat$attitude + dat$selfIdentity)$output$coef.raw['selfIdentity', 'estimate'])` (all variables are standardized). As the left diagram shows, the squared correlation between attitude and intention is *r*^2 = .03 + .07 = .10, and the squared correlation between self-identify and intention is *r*^2 = .151 + .07 = .221. In this situation, .07 or seven percent of the covariance between the variables is omitted from the equation when the regression coefficients are estimated.
-
-The right diagram shows the situation where the importance scale is included in the operationalisation of both constructs. The definitions of both constructs are therefore more broad than in the left diagram; but note that these broader definitions can be argued to be correct, and can conceivable be used in the same study. In this sample, the correlation coefficients with intention are `r formatR(cor(dat$intention, dat$attitudeImportance))` for attitude and `r formatR(cor(dat$intention, dat$selfIdentityImportance))` for self-identity, they together explain `r formatR(regr(dat$intention ~ dat$attitudeImportance + dat$selfIdentityImportance)$intermediate$rsq)` of the variance in intention, and their regression coefficients are respectively `r formatR(regr(dat$intention ~ dat$attitudeImportance + dat$selfIdentityImportance)$output$coef.raw['attitudeImportance', 'estimate'])` and `r formatR(regr(dat$intention ~ dat$attitudeImportance + dat$selfIdentityImportance)$output$coef.raw['selfIdentityImportance', 'estimate'])`. This diagram shows the large overlap between the variables: .176 of the variance is shared between attitude, self-identity, and intention. This .176 represents almost twenty percent of the variance in intention that cannot be designated to one of the predictors (and therefore, is not reflected in their regression coefficients).
+The right diagram shows the situation where the importance scale is included in the operationalisation of both constructs. The definitions of both constructs are therefore more broad than in the left diagram; but note that these broader definitions can be argued to be correct, and can conceivable be used in the same study. In this sample, the correlation coefficients with intention are .42 for attitude and .51 for self-identity, they together explain .27 of the variance in intention, and their regression coefficients are respectively .07 and .46. This diagram shows the large overlap between the variables: .176 of the variance is shared between attitude, self-identity, and intention. This .176 represents almost twenty percent of the variance in intention that cannot be designated to one of the predictors (and therefore, is not reflected in their regression coefficients).
 
 In the left situation, the correlations indicate that both attitude and self-identity seem feasible intervention targets. When removing their overlap, the apparent feasibility of attitude drops a bit, and although this paints a slightly misleading picture by exaggerating the differences in importance between attitude and self-identity, the effect is quite subtle.
 
@@ -393,25 +87,12 @@ This becomes problematic when engaging in behavior change. For example, in this 
 
 Thus, because estimates from multivariate analyses are problematic when establishing determinant relevance, it is better to base such decisions on the bivariate correlations, or more accurately, on the confidence intervals for these correlation coefficients, together with the information about the (sub-)determinants' distributions and means. We will now illustrate a method for efficiently inspecting all this information simultaneously: confidence interval based estimation of relevance.
 
-## Confidence interval based estimation of relevance
+Confidence interval based estimation of relevance
+-------------------------------------------------
 
-To illustrate confidence interval based estimation of relevance (CIBER), we will use four subdeterminants of attitude as these allow a more complete demonstration. The resulting CIBER plot is shown in Figure 2 (we refer readers who are interested in the CIBER plots obtained from the determinants' association with intention to the OSF repository of this article at https://osf.io/hg4ks/).
+To illustrate confidence interval based estimation of relevance (CIBER), we will use four subdeterminants of attitude as these allow a more complete demonstration. The resulting CIBER plot is shown in Figure 2 (we refer readers who are interested in the CIBER plots obtained from the determinants' association with intention to the OSF repository of this article at <https://osf.io/hg4ks/>).
 
-```{r figure-2, fig.width=11, fig.height=5, fig.cap="Figure 2: A CIBER plot showing hypothetical subdeterminants of attitude (i.e. attitudinal beliefs), their distributions and means (left panel) and their association to attitude and intention (right panel).", warning=FALSE}
-fig2 <- CIBER(dat,
-              determinants=c('attitude_good',
-                             'attitude_pleasant',
-                             'attitude_beneficial',
-                             'attitude_interesting'),
-              targets=c('attitude', 'intention'),
-              subQuestions=as.character(questionnaire[questionnaire$Variable=='Attitude', 'Item']),
-              leftAnchors=as.character(questionnaire[questionnaire$Variable=='Attitude', 'Left anchor']),
-              rightAnchors=as.character(questionnaire[questionnaire$Variable=='Attitude', 'Right anchor']));
-grid.draw(fig2);
-ggsave(fig2,
-       filename = "figure2.png",
-       width=12, height=3);
-```
+![Figure 2: A CIBER plot showing hypothetical subdeterminants of attitude (i.e. attitudinal beliefs), their distributions and means (left panel) and their association to attitude and intention (right panel).](ciber-introduction-tutorial-for-ehp_files/figure-markdown_github/figure-2-1.png)
 
 A CIBER plot contains a large amount of information. First, the left-hand panel shows the questions used to measure these subdeterminants, the left and right anchors of the answer scales, each participants' score, and a 99.99% confidence interval for the mean. This allows easy spotting of skewed distributions or other deviations from normality which are important to take into account when selecting determinants for intervention (with these simulated data, these distributions are approximately normal; for a real-life example, see Crutzen, Peters & Noijen, 2017).
 
@@ -421,150 +102,225 @@ Finally, the CIBER plot's title shows the proportions of explained variance. Thi
 
 To generate a CIBER plot, a function is available in the free R package `userfriendlyscience` (Peters, 2017). To install the package in R, use the following command;
 
-```
-install.packages('userfriendlyscience');
-```
+    install.packages('userfriendlyscience');
 
 This command is necessary only once; once the package has been installed, it will remain available. After having installed the package, it can be loaded in an R session by using the following command:
 
-```
-require('userfriendlyscience');
-```
+    require('userfriendlyscience');
 
 This needs to be repeated in every R session (because R has thousands of packages available, these are not all automatically loaded every time; users can indicate which packages they need in a session).
 
 Then, the CIBER plot can be generated using the `CIBER` command. For example, a simple version of the CIBER plot shown in Figure 2 can be obtained with this command:
 
-```
-CIBER(data=dat,
-      determinants=c('attitude_good',
-                     'attitude_pleasant',
-                     'attitude_beneficial',
-                     'attitude_interesting'),
-      targets=c('attitude', 'intention'));
-```
+    CIBER(data=dat,
+          determinants=c('attitude_good',
+                         'attitude_pleasant',
+                         'attitude_beneficial',
+                         'attitude_interesting'),
+          targets=c('attitude', 'intention'));
 
 In this command, the first argument ('data') specifies the data to use. This is a dataset that can be loaded into R using, for example, the `getData` command:
 
-```
-dat <- getData();
-```
+    dat <- getData();
 
 This will open a popup dialog where a datafile can be selected. The selected datafile is then read into memory and named `dat` (in R, multiple datasets can always be open, and therefore, naming a dataset when loading it is mandatory). The other two arguments, 'determinants', and 'targets' specific the variable names of the determinants (the rows of the CIBER plot) and the the higher level determinants or behavior variables with which to show associations in the right-hand panel. Thus, in the simplest case, it is possible to simply load one's dataset into R using the `getData` command and then use the `CIBER` command to specify which determinants and targets to plot.
 
 It is also possible to customize the plot by specifying, as was done in Figure 2, the questions used for each (sub-)determinant by using the 'subQuestions' argument; the left and right anchors by using the 'leftAnchor' and 'rightAnchor' arguments, and it is also possible to change the colors and set other options. An overview of all available options is available by using the following command, which will load the manual page for the CIBER command:
 
-```
-?CIBER
-```
+    ?CIBER
 
-## Conclusion
+Conclusion
+----------
 
 Establishing the relative importance of a set of (sub-)determinants, to then select the best intervention targets and be able to select the most fitting behavior change principles (e.g. methods for behavior change or behavior change techniques), is no straightforward affair. There are a number of potential pitfalls. In this article, we aimed to describe these pitfalls, explain why they are problematic, and we present an easy-to-use solution that is freely available. CIBER plots allow researchers and intervention developers to simultaneously evaluate the large amounts of information that need to be evaluated to select the determinants to target in an intervention to optimize the probability of successful behavior change. We hope this can contribute to more informed determinant selection and ultimately, more effective behavior change interventions.
 
-# References
+References
+==========
 
 Abraham, C., & Michie, S. (2008). A taxonomy of behavior change techniques used in interventions. Health Psychology, 27(3), 379–87. dio:10.1037/0278-6133.27.3.379
 
 Aunger, R., & Curtis, V. (2015). Gaining control: how human behavior evolved. Oxford: Oxford University Press.
 
-Azen, R., & Budescu, D. V. (2003). The dominance analysis approach for comparing predictors in multiple regression. Psychological Methods, 8, 129–148. 
+Azen, R., & Budescu, D. V. (2003). The dominance analysis approach for comparing predictors in multiple regression. Psychological Methods, 8, 129–148.
 
-Bartholomew, L. K., Parcel, G. S., & Kok, G. (1998). Intervention Mapping: A process for developing theory- and evidence-based health education programs. Health Education and Behavior, 25(5), 545–563. doi:10.1177/109019819802500502
+Bartholomew, L. K., Parcel, G. S., & Kok, G. (1998). Intervention Mapping: A process for developing theory- and evidence-based health education programs. Health Education and Behavior, 25(5), 545–563. <doi:10.1177/109019819802500502>
 
 Bartholomew Eldrigde, L. K., Markham, C. M., Ruiter, R. A. C., Fernàndez, M. E., Kok, G., & Parcel, G. S. (2016). Planning health promotion programs: An Intervention Mapping approach. San Francisco: Jossey-Bass.
 
-Budescu, D. V. (1993). Dominance analysis: a new approach to the problem of relative importance of predictors in multiple regression. Psychological Bulletin, 114, 542–551. doi:10.1037/0033-2909.114.3.542
+Budescu, D. V. (1993). Dominance analysis: a new approach to the problem of relative importance of predictors in multiple regression. Psychological Bulletin, 114, 542–551. <doi:10.1037/0033-2909.114.3.542>
 
 Cullen, K. W., Bartholomew, L. K., Parcel, G. S., & Kok, G. (1998). Intervention mapping: use of theory and data in the development of a fruit and vegetable nutrition program for girl scouts. Journal of Nutrition Education, 30(4), 188–195.
 
-Crutzen, R., & Peters, G.-J. Y. (2018). Evolutionary learning processes as the foundation for behaviour change. Health Psychology Review, 12(1), 43–57. doi:10.1080/17437199.2017.1362569
+Crutzen, R., & Peters, G.-J. Y. (2018). Evolutionary learning processes as the foundation for behaviour change. Health Psychology Review, 12(1), 43–57. <doi:10.1080/17437199.2017.1362569>
 
-Crutzen, R., Peters, G.-J. Y., & Noijen, J. (2017). Using Confidence Interval-Based Estimation of Relevance to select social-cognitive determinants for behaviour change interventions. Frontiers in Public Health. doi:10.3389/fpubh.2017.00165
+Crutzen, R., Peters, G.-J. Y., & Noijen, J. (2017). Using Confidence Interval-Based Estimation of Relevance to select social-cognitive determinants for behaviour change interventions. Frontiers in Public Health. <doi:10.3389/fpubh.2017.00165>
 
-Elwert, F., & Winship, C. (2014). Endogenous Selection Bias: The Problem of Conditioning on a Collider Variable. Annual Review of Sociology, 40(1), 31–53. doi:10.1146/annurev-soc-071913-043455
+Elwert, F., & Winship, C. (2014). Endogenous Selection Bias: The Problem of Conditioning on a Collider Variable. Annual Review of Sociology, 40(1), 31–53. <doi:10.1146/annurev-soc-071913-043455>
 
 Fishbein, M., & Ajzen, I. (2010). Predicting and Changing Behavior: The Reasoned Action Approach. New York: Taylor & Francis Group.
 
-Larsson, J. (2018). eulerr: Area-Proportional Euler and Venn Diagrams with Ellipses. R package version 4.1.0, https://cran.r-project.org/package=eulerr
+Larsson, J. (2018). eulerr: Area-Proportional Euler and Venn Diagrams with Ellipses. R package version 4.1.0, <https://cran.r-project.org/package=eulerr>
 
-Kok, G., Gottlieb, N. H., Peters, G. Y., Mullen, P. D., Parcel, G. S., Ruiter, R. A. C., … Bartholomew, L. K. (2016). A taxonomy of behavior change methods: an Intervention Mapping approach. Health Psychology Review, 10(3), 297–312. doi:10.1080/17437199.2015.1077155
+Kok, G., Gottlieb, N. H., Peters, G. Y., Mullen, P. D., Parcel, G. S., Ruiter, R. A. C., … Bartholomew, L. K. (2016). A taxonomy of behavior change methods: an Intervention Mapping approach. Health Psychology Review, 10(3), 297–312. <doi:10.1080/17437199.2015.1077155>
 
-Masters, R., Anwar, E., Collins, B., Cookson, R., & Capewell, S. (2017). Return on investment of public health interventions: a systematic review. Journal of Epidemiology & Community Health, 71(8), 827–834. doi:10.1136/jech-2016-208141
+Masters, R., Anwar, E., Collins, B., Cookson, R., & Capewell, S. (2017). Return on investment of public health interventions: a systematic review. Journal of Epidemiology & Community Health, 71(8), 827–834. <doi:10.1136/jech-2016-208141>
 
-Peters, G.-J. Y. (2017). Diamond Plots: a tutorial to introduce a visualisation tool that facilitates interpretation and comparison of multiple sample estimates while respecting their inaccuracy. Health Psychology Bulletin (under Review). Retrieved from http://diamondplots.com
+Peters, G.-J. Y. (2017). Diamond Plots: a tutorial to introduce a visualisation tool that facilitates interpretation and comparison of multiple sample estimates while respecting their inaccuracy. Health Psychology Bulletin (under Review). Retrieved from <http://diamondplots.com>
 
-Peters, G.-J. Y., & Crutzen, R. (2017). Pragmatic nihilism: how a Theory of Nothing can help health psychology progress. Health Psychology Review, 11(2). doi:10.1080/17437199.2017.1284015
+Peters, G.-J. Y., & Crutzen, R. (2017). Pragmatic nihilism: how a Theory of Nothing can help health psychology progress. Health Psychology Review, 11(2). <doi:10.1080/17437199.2017.1284015>
 
+Appendix
+========
 
+Background
+----------
 
-
-# Appendix
-
-## Background
-
-Note that because this is a living project, you will probably need the most up-to-date version of the `userfriendlyscience` package (*if* that has been submitted to CRAN yet). See https://userfriendlyscience.com for instructions as to how to install it (or instructions for how to install it from Github).
+Note that because this is a living project, you will probably need the most up-to-date version of the `userfriendlyscience` package (*if* that has been submitted to CRAN yet). See <https://userfriendlyscience.com> for instructions as to how to install it (or instructions for how to install it from Github).
 
 ### Full Disclosure
 
-The Open Science Framework repository for this article is https://osf.io/hg4ks/.
+The Open Science Framework repository for this article is <https://osf.io/hg4ks/>.
 
 ### License of these materials
 
-This file and the other materials in the OSF and GitHub repo's associated with this project are licensed under the Creative Commons attribution share alike license (CC-BY-NC-SA; see http://creativecommons.org/licenses/by-nc-sa/4.0/). This means that you are allowed to copy and distribute these files freely, but you’re not allowed to sell them. It also means that if you create derivative works (i.e. if you remix, transform, or build upon the material), you must distribute your contributions under the same license as the original.
+This file and the other materials in the OSF and GitHub repo's associated with this project are licensed under the Creative Commons attribution share alike license (CC-BY-NC-SA; see <http://creativecommons.org/licenses/by-nc-sa/4.0/>). This means that you are allowed to copy and distribute these files freely, but you’re not allowed to sell them. It also means that if you create derivative works (i.e. if you remix, transform, or build upon the material), you must distribute your contributions under the same license as the original.
 
-## Analyses
+Analyses
+--------
 
 ### Questionnaire
 
 These data were gathered by the following hypothetical questionnaire:
 
-```{r show-questionnaire}
-kable(questionnaire);
-```
+| Variable      | Item                                                                                                            | Left anchor     | Right anchor |
+|:--------------|:----------------------------------------------------------------------------------------------------------------|:----------------|:-------------|
+| Intention     | I intend to submit my next manuscript to Health Psychology Bulletin.                                            | Absolutely not  | Absolutely   |
+| Intention     | I will submit my next manuscript to Health Psychology Bulletin.                                                 | Unlikely        | Likely       |
+| Intention     | I am willing to submit my next manuscript to Health Psychology Bulletin.                                        | False           | True         |
+| Intention     | I plan to submit my next manuscript to Health Psychology Bulletin.                                              | Absolutely not  | Absolutely   |
+| Attitude      | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Bad             | Good         |
+| Attitude      | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Unpleasant      | Pleasant     |
+| Attitude      | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Harmful         | Beneficial   |
+| Attitude      | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Boring          | Interesting  |
+| Importance    | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Unimportant     | Important    |
+| Importance    | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Not essential   | Essential    |
+| Importance    | For me, submitting my next manuscript to Health Psychology Bulletin is ...                                      | Not significant | Significant  |
+| Self-identity | I see myself as someone who is concerned about submitting my next manuscript to Health Psychology Bulletin.     | Not at all      | Completely   |
+| Self-identity | I see myself as someone who submits their next manuscript to Health Psychology Bulletin.                        | Not at all      | Completely   |
+| Self-identity | I would feel at a loss if I were forced to give up submitting my next manuscript to Health Psychology Bulletin. | Absolutely not  | Absolutely   |
+| Self-identity | Submitting my next manuscript to Health Psychology Bulletin is an important part of who I am.                   | Not at all      | Very much so |
+| Self-identity | I am the kind of person who submits their next manuscript to Health Psychology Bulletin.                        | Not at all      | Completely   |
+| Self-identity | For me, submitting my next manuscript to Health Psychology Bulletin means more than just the act itself.        | Not at all      | Very much so |
+| Self-identity | Submitting my next manuscript to Health Psychology Bulletin is something I rarely even think about.             | Not at all      | Very much so |
 
 ### Correlations between latent variables in the population
 
-```{r latentAssociations}
-kable(cor(latentDat));
-```
+|              |  intention|   attitude|  importance|  selfIdentity|
+|--------------|----------:|----------:|-----------:|-------------:|
+| intention    |  1.0000000|  0.5066335|   0.5541531|     0.6399981|
+| attitude     |  0.5066335|  1.0000000|   0.7021682|     0.4843567|
+| importance   |  0.5541531|  0.7021682|   1.0000000|     0.7536562|
+| selfIdentity |  0.6399981|  0.4843567|   0.7536562|     1.0000000|
 
 ### Correlations in the sample (i.e. including measurement error)
 
-```{r sampleAssociations}
-pander(associationMatrix(dat[, scaleNames]));
-```
+<table style="width:100%;">
+<colgroup>
+<col width="28%" />
+<col width="22%" />
+<col width="22%" />
+<col width="22%" />
+<col width="5%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center"> </th>
+<th align="center">1.</th>
+<th align="center">2.</th>
+<th align="center">3.</th>
+<th align="center">4.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center"><strong>1. intention</strong></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr class="even">
+<td align="center"><strong>2. attitude</strong></td>
+<td align="center">r=[0.19; 0.44]</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr class="odd">
+<td align="center"></td>
+<td align="center">r=0.32, p&lt;.001</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr class="even">
+<td align="center"><strong>3. importance</strong></td>
+<td align="center">r=[0.32; 0.54]</td>
+<td align="center">r=[0.44; 0.64]</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr class="odd">
+<td align="center"></td>
+<td align="center">r=0.44, p&lt;.001</td>
+<td align="center">r=0.55, p&lt;.001</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr class="even">
+<td align="center"><strong>4. selfIdentity</strong></td>
+<td align="center">r=[0.35; 0.57]</td>
+<td align="center">r=[0.19; 0.44]</td>
+<td align="center">r=[0.44; 0.64]</td>
+<td align="center"></td>
+</tr>
+<tr class="odd">
+<td align="center"></td>
+<td align="center">r=0.47, p&lt;.001</td>
+<td align="center">r=0.32, p&lt;.001</td>
+<td align="center">r=0.55, p&lt;.001</td>
+<td align="center"></td>
+</tr>
+</tbody>
+</table>
 
 ### Squared sample correlations
 
-```{r squaredCorrelations}
-kable(cor(dat[, scaleNames]) ^ 2);
-```
+|              |  intention|   attitude|  importance|  selfIdentity|
+|--------------|----------:|----------:|-----------:|-------------:|
+| intention    |  1.0000000|  0.1000735|   0.1897279|     0.2201513|
+| attitude     |  0.1000735|  1.0000000|   0.2987592|     0.1038060|
+| importance   |  0.1897279|  0.2987592|   1.0000000|     0.2974845|
+| selfIdentity |  0.2201513|  0.1038060|   0.2974845|     1.0000000|
 
 ### Squared partial correlations
 
-```{r squaredPartialCors}
-kable(pcor(dat[, scaleNames])$estimate ^ 2);
-```
+|              |  intention|   attitude|  importance|  selfIdentity|
+|--------------|----------:|----------:|-----------:|-------------:|
+| intention    |  1.0000000|  0.0096216|   0.0301140|     0.0931938|
+| attitude     |  0.0096216|  1.0000000|   0.1945325|     0.0000065|
+| importance   |  0.0301140|  0.1945325|   1.0000000|     0.1473973|
+| selfIdentity |  0.0931938|  0.0000065|   0.1473973|     1.0000000|
 
 ### Squared semipartial correlations
 
-```{r squaredSemiPartialCors}
-kable(spcor(dat[, scaleNames])$estimate ^ 2);
-```
+|              |  intention|   attitude|  importance|  selfIdentity|
+|--------------|----------:|----------:|-----------:|-------------:|
+| intention    |  1.0000000|  0.0070613|   0.0225676|     0.0746984|
+| attitude     |  0.0067391|  1.0000000|   0.1675335|     0.0000045|
+| importance   |  0.0165340|  0.1286101|   1.0000000|     0.0920606|
+| selfIdentity |  0.0653931|  0.0000041|   0.1100025|     1.0000000|
 
 ### The CIBER plots of these determinants
 
-```{r CIBERplot-of-determinants, fig.width=11, fig.height=5, fig.cap="CIBER plot of attitude and self-identity (without and including the 'importance scale') predicting intention."}
-grid.arrange(CIBER(dat, determinants=c('attitude', 'selfIdentity'), targets='intention', drawPlot=FALSE),
-             CIBER(dat, determinants=c('attitudeImportance', 'selfIdentityImportance'), targets='intention', drawPlot=FALSE),
-             ncol=1);
-```
-
-```{r extrastuff, eval=FALSE, include=FALSE}
-testDat <- dat[, c('intention', 'attitudeImportance', 'selfIdentityImportance')];
-names(testDat) <- c('Y', 'X1', 'X2');
-round(cor(testDat), 2);
-regr(Y ~ X1 + X2, data=testDat);
-regsCovarPlot(Y ~ X1 + X2, testDat);
-```
+![CIBER plot of attitude and self-identity (without and including the 'importance scale') predicting intention.](ciber-introduction-tutorial-for-ehp_files/figure-markdown_github/CIBERplot-of-determinants-1.png)
